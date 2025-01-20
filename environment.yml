@@ -1,0 +1,15 @@
+name: linkml-toolkit
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.7,<3.13
+  - click>=8.0.0
+  - rich>=10.0.0
+  - pyyaml>=5.4.0
+  - rdflib>=6.0.0
+  - jsonschema>=4.0.0
+  - pip
+  - pip:
+      - linkml==1.5.6
+      - linkml-runtime==1.5.6

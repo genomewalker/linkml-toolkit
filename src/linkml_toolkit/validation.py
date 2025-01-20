@@ -1,13 +1,13 @@
 """Schema validation functionality."""
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Set
 from pathlib import Path
 import logging
 from dataclasses import dataclass
 import yaml
-from linkml_runtime.utils.schemaview import SchemaView
-from linkml_runtime.utils.validation import ValidationResult, validate_schema
 from rich.console import Console
+from linkml_runtime.utils.schemaview import SchemaView
+from linkml_runtime.linkml_model import SchemaDefinition
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -22,29 +22,21 @@ class ValidationError:
 
 
 class SchemaValidator:
-    def __init__(self, quiet: bool = False):
+    """Schema validator for LinkML schemas."""
+
+    def __init__(self, quiet: bool = False, strict: bool = False):
         """Initialize the schema validator."""
         self.quiet = quiet
+        self.strict = strict
 
     def validate_schema(self, schema_path: Union[str, Path]) -> List[ValidationError]:
-        """Validate a LinkML schema file."""
+        """Validate a LinkML schema file with configurable strictness."""
         schema_path = Path(schema_path)
         errors = []
 
         try:
-            # Load and parse the YAML first
-            try:
-                with open(schema_path) as f:
-                    schema_dict = yaml.safe_load(f)
-            except yaml.YAMLError as e:
-                errors.append(
-                    ValidationError(
-                        path=str(schema_path),
-                        message=f"Invalid YAML syntax: {str(e)}",
-                        severity="ERROR",
-                    )
-                )
-                return errors
+            # Load and parse the YAML
+            schema_dict = self._load_yaml(schema_path)
 
             # Basic structure validation
             if not isinstance(schema_dict, dict):
@@ -57,47 +49,40 @@ class SchemaValidator:
                 )
                 return errors
 
-            # Required top-level fields
-            required_fields = ["name", "id"]
-            for field in required_fields:
-                if field not in schema_dict:
-                    errors.append(
-                        ValidationError(
-                            path=str(schema_path),
-                            message=f"Missing required field: {field}",
-                            severity="ERROR",
-                        )
-                    )
-
-            # Validate using LinkML's validation utilities
-            try:
-                schema_view = SchemaView(str(schema_path))
-                validation_result = validate_schema(schema_view.schema)
-
-                if not validation_result.valid:
-                    for error in validation_result.results:
-                        errors.append(
-                            ValidationError(
-                                path=str(schema_path),
-                                message=error.message,
-                                severity="ERROR",
-                                details=(
-                                    {"location": error.location}
-                                    if error.location
-                                    else None
-                                ),
-                            )
-                        )
-
-                # Additional validations using SchemaView
-                self._validate_references(schema_view, errors, schema_path)
-
-            except Exception as e:
+            # Validate minimal required fields
+            if "name" not in schema_dict:
                 errors.append(
                     ValidationError(
                         path=str(schema_path),
-                        message=f"Schema validation error: {str(e)}",
-                        severity="ERROR",
+                        message="Schema must have a 'name' field",
+                        severity="WARNING",
+                    )
+                )
+                schema_dict["name"] = schema_path.stem
+
+            if "id" not in schema_dict:
+                errors.append(
+                    ValidationError(
+                        path=str(schema_path),
+                        message="Schema should have an 'id' field",
+                        severity="WARNING",
+                    )
+                )
+                schema_dict["id"] = f"https://w3id.org/linkml/{schema_dict['name']}"
+
+            # Create SchemaDefinition and SchemaView
+            try:
+                schema_def = SchemaDefinition(**schema_dict)
+                schema_view = SchemaView(schema_def)
+                content_errors = self._validate_schema_contents(schema_view, schema_path)
+                errors.extend(content_errors)
+            except Exception as e:
+                severity = "ERROR" if self.strict else "WARNING"
+                errors.append(
+                    ValidationError(
+                        path=str(schema_path),
+                        message=str(e),
+                        severity=severity,
                     )
                 )
 
@@ -112,40 +97,115 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_references(
-        self, schema_view: SchemaView, errors: List[ValidationError], schema_path: Path
-    ):
-        """Validate references between schema elements."""
-        # Check slot references in classes
-        for class_name, class_def in schema_view.all_classes().items():
-            for slot_name in class_def.slots:
-                if not schema_view.get_slot(slot_name):
-                    errors.append(
-                        ValidationError(
-                            path=str(schema_path),
-                            message=f"Class '{class_name}' references undefined slot '{slot_name}'",
-                            severity="ERROR",
-                            details={"class": class_name, "slot": slot_name},
-                        )
-                    )
+    def _load_yaml(self, path: Path) -> dict:
+        """Load and parse YAML file."""
+        try:
+            with open(path) as f:
+                return yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML syntax: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Error reading file: {str(e)}")
 
-        # Check range references
-        for slot_name, slot_def in schema_view.all_slots().items():
-            if slot_def.range:
-                range_name = slot_def.range
-                if not (
-                    schema_view.get_type(range_name)
-                    or schema_view.get_class(range_name)
-                    or schema_view.get_enum(range_name)
-                ):
-                    errors.append(
-                        ValidationError(
-                            path=str(schema_path),
-                            message=f"Slot '{slot_name}' references undefined range '{range_name}'",
-                            severity="ERROR",
-                            details={"slot": slot_name, "range": range_name},
+    def _validate_schema_contents(
+        self, schema_view: SchemaView, schema_path: Path
+    ) -> List[ValidationError]:
+        """Validate schema contents."""
+        errors = []
+
+        try:
+            # Validate class references
+            for class_name, class_def in schema_view.all_classes().items():
+                if hasattr(class_def, "slots"):
+                    for slot_name in class_def.slots or []:
+                        if not schema_view.get_slot(slot_name):
+                            errors.append(
+                                ValidationError(
+                                    path=str(schema_path),
+                                    message=f"Class '{class_name}' references undefined slot '{slot_name}'",
+                                    severity="ERROR",
+                                    details={"class": class_name, "slot": slot_name},
+                                )
+                            )
+
+                # Validate inheritance
+                if hasattr(class_def, "is_a") and class_def.is_a:
+                    if not schema_view.get_class(class_def.is_a):
+                        errors.append(
+                            ValidationError(
+                                path=str(schema_path),
+                                message=f"Class '{class_name}' inherits from undefined class '{class_def.is_a}'",
+                                severity="ERROR",
+                                details={"class": class_name, "parent": class_def.is_a},
+                            )
                         )
-                    )
+
+            # Validate slot ranges
+            for slot_name, slot_def in schema_view.all_slots().items():
+                if hasattr(slot_def, "range") and slot_def.range:
+                    range_name = slot_def.range
+                    if not self._is_valid_range(range_name, schema_view):
+                        errors.append(
+                            ValidationError(
+                                path=str(schema_path),
+                                message=f"Slot '{slot_name}' references undefined range '{range_name}'",
+                                severity="ERROR",
+                                details={"slot": slot_name, "range": range_name},
+                            )
+                        )
+
+                # Validate domain
+                if hasattr(slot_def, "domain") and slot_def.domain:
+                    if not schema_view.get_class(slot_def.domain):
+                        errors.append(
+                            ValidationError(
+                                path=str(schema_path),
+                                message=f"Slot '{slot_name}' references undefined domain '{slot_def.domain}'",
+                                severity="ERROR",
+                                details={"slot": slot_name, "domain": slot_def.domain},
+                            )
+                        )
+
+        except Exception as e:
+            if self.strict:
+                raise
+            logger.debug(f"Non-critical validation error: {str(e)}")
+
+        return errors
+
+    def _is_valid_range(self, range_name: str, schema_view: SchemaView) -> bool:
+        """Check if a range type is valid."""
+        builtin_types = {
+            "string",
+            "integer",
+            "boolean",
+            "datetime",
+            "date",
+            "time",
+            "float",
+            "double",
+            "decimal",
+            "uri",
+            "uriorcurie",
+            "ncname",
+            "objectidentifier",
+            "nodeidentifier",
+        }
+        return (
+            range_name in builtin_types
+            or schema_view.get_type(range_name) is not None
+            or schema_view.get_class(range_name) is not None
+            or schema_view.get_enum(range_name) is not None
+        )
+
+    def validate_multiple(self, schema_paths: List[Path]) -> Dict[str, List[ValidationError]]:
+        """Validate multiple schema files."""
+        results = {}
+        for path in schema_paths:
+            if not self.quiet:
+                logger.info(f"Validating schema: {path}")
+            results[str(path)] = self.validate_schema(path)
+        return results
 
     def format_errors(self, errors: List[ValidationError]) -> str:
         """Format validation errors into a readable string."""
@@ -154,21 +214,53 @@ class SchemaValidator:
 
         formatted = []
         for error in errors:
-            message = f"[red]ERROR[/red]: {error.message}"
+            if error.severity == "ERROR":
+                msg = f"[red]{error.severity}[/red]: {error.message}"
+            else:
+                msg = f"[yellow]{error.severity}[/yellow]: {error.message}"
+
             if error.details:
                 details = "\n".join(f"  {k}: {v}" for k, v in error.details.items())
-                message += f"\n{details}"
-            formatted.append(message)
+                msg += f"\n{details}"
+            formatted.append(msg)
 
         return "\n".join(formatted)
 
-    def validate_multiple(
-        self, schema_paths: List[Path]
-    ) -> Dict[str, List[ValidationError]]:
-        """Validate multiple schema files."""
-        results = {}
-        for path in schema_paths:
-            if not self.quiet:
-                logger.info(f"Validating schema: {path}")
-            results[str(path)] = self.validate_schema(path)
-        return results
+
+def display_validation_errors(errors):
+    """Display validation errors with proper formatting."""
+    console = Console()
+
+    error_found = False
+    warning_found = False
+
+    # Group by severity
+    error_messages = []
+    warning_messages = []
+
+    for error in errors:
+        if error.severity == "ERROR":
+            error_found = True
+            msg_lines = [error.message]
+            if error.details:
+                for key, value in error.details.items():
+                    msg_lines.append(f"  {key}: {value}")
+            error_messages.append(msg_lines)
+        else:
+            warning_found = True
+            msg_lines = [error.message]
+            if error.details:
+                for key, value in error.details.items():
+                    msg_lines.append(f"  {key}: {value}")
+            warning_messages.append(msg_lines)
+
+    # Display errors and warnings
+    if error_found or warning_found:
+        console.print("Validation Issues:", style="bold red")
+        for msg_lines in error_messages + warning_messages:
+            for i, line in enumerate(msg_lines):
+                style = "red" if i == 0 else "dim"
+                console.print(f"• {line}", style=style)
+
+    # Return True if any issues are found
+    return error_found or warning_found

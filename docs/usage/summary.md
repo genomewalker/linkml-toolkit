@@ -30,7 +30,7 @@ lmtk summary --schema schema.yaml -s classes -s slots
 # File: docs/usage/validation.md
 # Schema Validation
 
-The `validate` command performs comprehensive validation of LinkML schemas.
+The `validate` command performs simple validation of LinkML schemas.
 
 ## Basic Validation
 

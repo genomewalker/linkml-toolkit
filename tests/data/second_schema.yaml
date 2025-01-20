@@ -1,13 +1,23 @@
 id: https://example.org/second
 name: second_schema
 description: Another test schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+  second: https://example.org/second/
+default_prefix: second
+
+imports:
+  - linkml:types
 
 classes:
   Person:
+    description: A person with different attributes
     slots:
       - id
       - email
   Address:
+    description: An address
     slots:
       - street
       - city

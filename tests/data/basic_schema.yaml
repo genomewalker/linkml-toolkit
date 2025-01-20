@@ -1,9 +1,18 @@
 id: https://example.org/basic
 name: basic_schema
 description: A basic test schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+  basic: https://example.org/basic/
+default_prefix: basic
+
+imports:
+  - linkml:types
 
 classes:
   Person:
+    description: A person
     slots:
       - id
       - name
@@ -17,9 +26,3 @@ slots:
     range: string
   age:
     range: integer
-
-types:
-  string:
-    uri: xsd:string
-  integer:
-    uri: xsd:integer

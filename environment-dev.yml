@@ -1,0 +1,31 @@
+name: linkml-toolkit-dev
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Base Python
+  - python>=3.7,<3.13
+  # Core dependencies available in conda-forge
+  - click>=8.0.0
+  - rich>=10.0.0
+  - pyyaml>=5.4.0
+  - rdflib>=6.0.0
+  - jsonschema>=4.0.0
+  # Development dependencies available in conda
+  - pytest>=6.0
+  - pytest-cov>=2.0
+  - tox>=3.24
+  - coverage>=5.0
+  - black>=22.0
+  - isort>=5.0
+  - mypy>=0.910
+  # Documentation dependencies
+  - mkdocs>=1.2
+  - mkdocs-material>=8.0
+  - pip
+  - pip:
+      # Packages only available via pip
+      - linkml==1.5.6
+      - linkml-runtime==1.5.6
+      - mkdocstrings>=0.18
+      - setuptools_scm>=6.2

@@ -7,7 +7,7 @@ We welcome contributions to the LinkML Toolkit! This document provides guideline
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/yourusername/linkml-toolkit.git
+   git clone https://github.com/genomewalker/linkml-toolkit.git
    cd linkml-toolkit
    ```
 

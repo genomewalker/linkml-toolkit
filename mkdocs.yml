@@ -1,10 +1,10 @@
 site_name: LinkML Toolkit
-site_description: A comprehensive toolkit for working with LinkML schemas
+site_description: A simple toolkit for working with LinkML schemas
 site_author: Your Name
-site_url: https://github.com/yourusername/linkml-toolkit
+site_url: https://github.com/genomewalker/linkml-toolkit
 
-repo_name: yourusername/linkml-toolkit
-repo_url: https://github.com/yourusername/linkml-toolkit
+repo_name: genomewalker/linkml-toolkit
+repo_url: https://github.com/genomewalker/linkml-toolkit
 
 theme:
   name: material

@@ -1,6 +1,6 @@
 # LinkML Toolkit
 
-A comprehensive toolkit for working with LinkML schemas. Provides functionality for analyzing, validating, merging, and converting LinkML schemas.
+A simple toolkit for working with LinkML schemas. Provides functionality for analyzing, validating, merging, and converting LinkML schemas.
 
 ## Features
 
@@ -50,7 +50,7 @@ pip install linkml-toolkit
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/linkml-toolkit.git
+git clone https://github.com/genomewalker/linkml-toolkit.git
 cd linkml-toolkit
 pip install -e .
 ```
