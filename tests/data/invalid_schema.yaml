@@ -1,0 +1,6 @@
+name: invalid_schema
+# Missing id field intentionally
+classes:
+  InvalidClass:
+    slots:
+      - nonexistent_slot

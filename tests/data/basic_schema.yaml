@@ -1,0 +1,25 @@
+id: https://example.org/basic
+name: basic_schema
+description: A basic test schema
+
+classes:
+  Person:
+    slots:
+      - id
+      - name
+      - age
+
+slots:
+  id:
+    range: string
+    identifier: true
+  name:
+    range: string
+  age:
+    range: integer
+
+types:
+  string:
+    uri: xsd:string
+  integer:
+    uri: xsd:integer
