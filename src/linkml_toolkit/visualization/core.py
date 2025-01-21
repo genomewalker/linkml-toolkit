@@ -1,5 +1,5 @@
 # File: src/linkml_toolkit/visualization/core.py
-"""Core visualization generation functionality."""
+"""Core visualization generation functionality with search capabilities."""
 
 from pathlib import Path
 from typing import Dict, Optional, List, Union
@@ -82,78 +82,95 @@ class SchemaVisualizer:
     def _create_base_template(self, title: str, content: str) -> str:
         """Create the base HTML template."""
         return f"""<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.2.4/mermaid.min.js"></script>
-    <style>
-        .sidebar {{ height: calc(100vh - 4rem); }}
-        .main-content {{ height: calc(100vh - 4rem); }}
-        .search-highlight {{ background-color: yellow; }}
-        
-        @media print {{
-            .no-print {{ display: none; }}
-            .page-break {{ page-break-before: always; }}
-        }}
-        
-        .transition-transform {{
-            transition: transform 0.3s ease-in-out;
-        }}
-        
-        .rotate-180 {{
-            transform: rotate(180deg);
-        }}
-    </style>
-</head>
-<body class="bg-gray-100">
-    {content}
-    <script>
-        // Initialize mermaid for diagrams
-        mermaid.initialize({{ startOnLoad: true }});
-        
-        // Handle detail toggles
-        function toggleDetails(elementId) {{
-            const element = document.getElementById(elementId);
-            const button = document.querySelector(`button[onclick*="${{elementId}}"]`);
+    <html lang="en" class="scroll-smooth">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{title}</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.2.4/mermaid.min.js"></script>
+        <style>
+            .sidebar {{ height: calc(100vh - 4rem); }}
+            .main-content {{ height: calc(100vh - 4rem); }}
+            .search-highlight {{ background-color: rgba(145, 174, 183, 0.5); color: #000000; }}
             
-            if (element) {{
-                const isHidden = element.classList.contains('hidden');
-                element.classList.toggle('hidden');
+            @media print {{
+                .no-print {{ display: none; }}
+                .page-break {{ page-break-before: always; }}
+            }}
+            
+            .transition-transform {{
+                transition: transform 0.3s ease-in-out;
+            }}
+            
+            .rotate-180 {{
+                transform: rotate(180deg);
+            }}
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        {content}
+        <script>
+            // Initialize mermaid for diagrams
+            mermaid.initialize({{ startOnLoad: true }});
+
+            // Updated Search Functionality
+            function filterElements() {{
+                const query = document.getElementById('search-box').value.toLowerCase();
+                const elements = document.querySelectorAll('[data-searchable="true"]');
                 
-                if (button) {{
-                    const icon = button.querySelector('svg');
-                    if (icon) {{
-                        icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+                // Track the total counts for each type
+                const totalCounts = {{}};
+                elements.forEach(el => {{
+                    const type = el.dataset.type;
+                    if (!totalCounts[type]) {{
+                        totalCounts[type] = 0;
                     }}
+                    totalCounts[type]++;
+                }});
+
+                let visibleCount = {{}};
+
+                // Reset styles for all elements before applying filters
+                elements.forEach(el => {{
+                    el.style.display = ''; // Show all elements
+                    el.classList.remove('search-highlight'); // Remove highlight
+                }});
+
+                // Apply filter if query is not empty
+                if (query) {{
+                    elements.forEach(el => {{
+                        const text = el.textContent.toLowerCase();
+                        const type = el.dataset.type;
+
+                        if (!visibleCount[type]) {{
+                            visibleCount[type] = 0;
+                        }}
+
+                        if (text.includes(query)) {{
+                            el.style.display = ''; // Show matching element
+                            el.classList.add('search-highlight'); // Add highlight
+                            visibleCount[type]++;
+                        }} else {{
+                            el.style.display = 'none'; // Hide non-matching element
+                        }}
+                    }});
+                }} else {{
+                    // If the query is empty, reset visible counts to total counts
+                    visibleCount = {{ ...totalCounts }};
                 }}
+
+                // Update sidebar counts
+                Object.keys(totalCounts).forEach(type => {{
+                    const countElement = document.getElementById(`${{type}}-count`);
+                    if (countElement) {{
+                        countElement.textContent = visibleCount[type];
+                    }}
+                }});
             }}
-        }}
-
-        // Handle section toggles in sidebar
-        function toggleSection(sectionId) {{
-            const list = document.getElementById(`${{sectionId}}-list`);
-            const icon = document.getElementById(`${{sectionId}}-icon`);
-            
-            if (list && icon) {{
-                const isHidden = list.classList.contains('hidden');
-                list.classList.toggle('hidden');
-                icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-            }}
-        }}
-    </script>
-</body>
-</html>"""
-
-    def _save_html(self, content: str, output_path: Union[str, Path]) -> None:
-        """Save HTML content to file."""
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        </script>
+    </body>
+    </html>"""
 
     def _generate_header(self) -> str:
         """Generate the header section."""
@@ -171,10 +188,40 @@ class SchemaVisualizer:
                             {metadata.get('version', 'Unknown')}
                         </span>
                     </div>
+                    <div class="flex items-center">
+                        <input
+                            type="text"
+                            id="search-box"
+                            class="border border-gray-300 rounded-lg px-4 py-2"
+                            placeholder="Search..."
+                            oninput="filterElements()"
+                        />
+                    </div>
                 </div>
             </div>
         </header>
         """
+
+    def _generate_sidebar(self) -> str:
+        """Generate the navigation sidebar."""
+        return f"""
+        <aside class="w-64 bg-white shadow-md fixed h-full overflow-y-auto">
+            <nav class="px-4 py-4">
+                <div class="space-y-2">
+                    <a href="#overview" class="block px-4 py-2 rounded hover:bg-gray-100 font-medium">Overview</a>
+                    {self._generate_sidebar_sections()}
+                </div>
+            </nav>
+        </aside>
+        """
+
+    def _save_html(self, content: str, output_path: Union[str, Path]) -> None:
+        """Save HTML content to file."""
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
     def _generate_stats_badges(self, stats: Dict[str, int]) -> str:
         """Generate the statistics badges."""
@@ -192,19 +239,6 @@ class SchemaVisualizer:
             )
         return "\n".join(badges)
 
-    def _generate_sidebar(self) -> str:
-        """Generate the navigation sidebar."""
-        return f"""
-        <aside class="w-64 bg-white shadow-md fixed h-full overflow-y-auto">
-            <nav class="px-4 py-4">
-                <div class="space-y-2">
-                    <a href="#overview" class="block px-4 py-2 rounded hover:bg-gray-100 font-medium">Overview</a>
-                    {self._generate_sidebar_sections()}
-                </div>
-            </nav>
-        </aside>
-        """
-
     def _generate_sidebar_sections(self) -> str:
         """Generate sidebar navigation sections."""
         sections = []
@@ -215,20 +249,21 @@ class SchemaVisualizer:
 
     def _generate_sidebar_section(self, name: str, count: int) -> str:
         """Generate a sidebar section."""
+        section_type = name.lower()
         return f"""
-        <div class="space-y-1">
+        <div class="space-y-1" data-section-type="{section_type}">
             <button class="w-full flex items-center justify-between px-4 py-2 text-left rounded hover:bg-gray-100 font-medium"
-                    onclick="toggleSection('{name.lower()}')">
+                    onclick="toggleSection('{section_type}')">
                 <span>{name.title()}</span>
                 <div class="flex items-center">
-                    <span class="text-sm text-gray-500 mr-2">{count}</span>
-                    <svg class="h-5 w-5" id="{name.lower()}-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span id="{section_type}-count" data-type="{section_type}" class="text-sm text-gray-500 mr-2">{count}</span>
+                    <svg class="h-5 w-5" id="{section_type}-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </div>
             </button>
-            <div id="{name.lower()}-list" class="hidden pl-4 space-y-1">
-                {self._generate_sidebar_links(self.viz_data['structure'][name], name)}
+            <div id="{section_type}-list" class="hidden pl-4 space-y-1">
+                {self._generate_sidebar_links(self.viz_data['structure'][name], section_type)}
             </div>
         </div>
         """
@@ -240,8 +275,10 @@ class SchemaVisualizer:
             links.append(
                 f"""
                 <a href="#{section_type}-{name}" 
-                   class="block px-4 py-2 text-sm rounded hover:bg-gray-100 truncate" 
-                   title="{name}">
+                class="block px-4 py-2 text-sm rounded hover:bg-gray-100 truncate" 
+                data-searchable="true"
+                data-type="{section_type}"
+                title="{name}">
                     {name}
                 </a>
             """
@@ -382,7 +419,7 @@ class SchemaVisualizer:
         details_content = generate_element_details(element_type, info, self.schema_view)
 
         return f"""
-        <div id="{element_type}-{name}" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+        <div id="{element_type}-{name}" data-searchable="true" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
             <div class="p-4">
                 <h3 class="text-lg font-semibold mb-2">{name}</h3>
                 

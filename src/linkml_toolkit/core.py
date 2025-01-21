@@ -56,7 +56,7 @@ class LinkMLProcessor:
         self.schema = self._create_schema_definition(self.schema_dict)
 
         if validate:
-            self.validate_schema()
+            self.errors = self.validator.validate_schema(self.schema_path)
 
         # Initialize SchemaView
         self.schema_view = SchemaView(self.schema)
@@ -152,36 +152,6 @@ class LinkMLProcessor:
                 raise ValueError(f"Error creating SchemaDefinition: {str(e)}")
             # In non-strict mode, create minimal schema
             return SchemaDefinition(name=schema_dict["name"], id=schema_dict["id"])
-
-    def validate_schema(self):
-        """Validate the schema and handle errors based on strict mode."""
-        try:
-            # Validate schema
-            self.errors = self.validator.validate_schema(self.schema_path)
-
-            if self.errors:
-                error_str = self.validator.format_errors(self.errors)
-
-                # Display errors in the console with rich formatting
-                if not self.quiet:
-                    console.print(f"[bold red]Schema validation failed:[/bold red]\n{error_str}")
-
-                # Remove rich markup for plain-text logs and exceptions
-                plain_error_str = Text.from_markup(error_str).plain
-
-                # Raise an exception in strict mode or if any ERROR severity errors exist
-                if self.strict or any(e.severity == "ERROR" for e in self.errors):
-                    raise ValueError(f"Schema validation failed:\n{plain_error_str}")
-
-                # Log warnings in non-strict mode with plain text
-                if not self.quiet:
-                    logger.warning(f"Schema validation warnings:\n{plain_error_str}")
-
-        except Exception as e:
-            if self.strict:
-                raise
-            elif not self.quiet:
-                logger.warning(f"Schema validation error: {e}")
 
     def _convert_to_dict(self, obj: Any) -> Dict:
         """Helper method to safely convert objects to dictionaries."""
@@ -648,7 +618,12 @@ class LinkMLProcessor:
 
     @classmethod
     def merge_multiple(
-        cls, schema_list: str, input_type: str = "auto", validate: bool = True, strict: bool = False
+        cls,
+        schema_list: str,
+        input_type: str = "auto",
+        validate: bool = True,
+        strict: bool = False,
+        return_errors: bool = True,
     ) -> Dict:
         """
         Merge multiple schemas while preserving structure of the first schema.
@@ -667,9 +642,9 @@ class LinkMLProcessor:
 
         if len(paths) < 2:
             raise ValueError("At least two schemas are required for merging")
-
         # Process and merge schemas
         processed_schemas = []
+        errors = {}
         for path in paths:
             try:
                 processor = cls(path, validate=validate, strict=strict)
@@ -677,6 +652,8 @@ class LinkMLProcessor:
                     processed_schemas.append(processor)
                 else:
                     logger.warning(f"Skipping empty schema: {path}")
+                if processor.errors:
+                    errors[str(path)] = processor.errors
             except Exception as e:
                 logger.error(f"Failed to process schema {path}: {e}")
                 if strict:
@@ -752,6 +729,8 @@ class LinkMLProcessor:
                         )
                         merged["subsets"][key] = empty_format
 
+        if return_errors:
+            return merged, errors
         return merged
 
     @classmethod

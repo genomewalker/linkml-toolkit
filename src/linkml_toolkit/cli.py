@@ -430,13 +430,7 @@ def display_schema_analysis(results: Dict, detailed: bool = False):
 @click.option("--strict", is_flag=True, help="Enable strict validation mode")
 @click.version_option()
 def main(quiet, strict):
-    """LinkML Toolkit - A comprehensive toolkit for working with LinkML schemas.
-
-    Basic Usage:
-        lmtk analyze --schema schema.yaml
-        lmtk validate --schema schema.yaml
-        lmtk export --schema schema.yaml --format json
-    """
+    """LinkML Toolkit - A comprehensive toolkit for working with LinkML schemas."""
     setup_logging(quiet)
     ctx = click.get_current_context()
     ctx.ensure_object(dict)
@@ -510,6 +504,25 @@ def analyze(
         # Validate schema loading
         try:
             processor = LinkMLProcessor(schema, validate=True, strict=strict)
+            errors = processor.validator.validate_schema(schema)
+            if errors:
+                for error in errors:
+                    severity = (
+                        "[red]ERROR[/red]"
+                        if error.severity == "ERROR"
+                        else "[yellow]WARNING[/yellow]"
+                    )
+                    console.print(f"{severity}: {error.message}")
+                    if error.details:
+                        for key, value in error.details.items():
+                            console.print(f"  {key}: {value}")
+                if strict:
+                    sys.exit(1)
+                else:
+                    console.print(
+                        "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                    )
+
         except Exception as schema_load_error:
             console.print(f"[red]Error loading schema:[/red] {str(schema_load_error)}")
             sys.exit(1)
@@ -699,6 +712,25 @@ def export(schema, format, output, rdf_format, sql_dialect):
     strict = ctx.obj.get("strict", False)
 
     try:
+        # Validate schema
+        validator = SchemaValidator(schema, strict=strict)
+        errors = validator.validate_schema(schema)
+        if errors:
+            for error in errors:
+                severity = (
+                    "[red]ERROR[/red]" if error.severity == "ERROR" else "[yellow]WARNING[/yellow]"
+                )
+                console.print(f"{severity}: {error.message}")
+                if error.details:
+                    for key, value in error.details.items():
+                        console.print(f"  {key}: {value}")
+            if strict:
+                sys.exit(1)
+            else:
+                console.print(
+                    "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                )
+
         exporter = SchemaExporter(schema)
         output_path = Path(output)
 
@@ -815,18 +847,38 @@ def combine(schema, additional_schemas, output, mode):
     strict = ctx.obj.get("strict", False)
 
     try:
-        # Combine the base schema with additional schemas
         all_schemas = [schema] + list(additional_schemas)
-
-        # Convert list of paths to comma-separated string
         schema_list = ",".join(str(s) for s in all_schemas)
 
         if mode == "merge":
-            result = LinkMLProcessor.merge_multiple(schema_list, validate=True, strict=strict)
+            result, errors = LinkMLProcessor.merge_multiple(
+                schema_list, validate=True, strict=strict, return_errors=True
+            )
         else:  # concat
-            result = LinkMLProcessor.concat_multiple(schema_list, validate=True, strict=strict)
+            result, errors = LinkMLProcessor.concat_multiple(
+                schema_list, validate=True, strict=strict, return_errors=True
+            )
 
-        # Save result using first schema as base
+        if errors:
+            for schema_path, schema_errors in errors.items():
+                console.print(f"\n[bold red]Validation errors in schema: {schema_path}[/bold red]")
+                for error in schema_errors:
+                    severity = (
+                        "[red]ERROR[/red]"
+                        if error.severity == "ERROR"
+                        else "[yellow]WARNING[/yellow]"
+                    )
+                    console.print(f"{severity}: {error.message}")
+                    if error.details:
+                        for key, value in error.details.items():
+                            console.print(f"  {key}: {value}")
+            if strict:
+                sys.exit(1)
+            else:
+                console.print(
+                    "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                )
+
         processor = LinkMLProcessor(schema, validate=False)
         processor.save(result, output)
 
