@@ -7,7 +7,7 @@ def test_merge_multiple(basic_schema, second_schema):
     schema_list = f"{basic_schema},{second_schema}"
 
     # Merge schemas
-    merged = LinkMLProcessor.merge_multiple(schema_list)
+    merged = LinkMLProcessor.merge_multiple(schema_list, return_errors=False)
 
     # Verify merged schema contents
     assert merged is not None
@@ -25,7 +25,7 @@ def test_concat_multiple(basic_schema, second_schema):
     schema_list = f"{basic_schema},{second_schema}"
 
     # Concatenate schemas
-    concatenated = LinkMLProcessor.concat_multiple(schema_list)
+    concatenated = LinkMLProcessor.concat_multiple(schema_list, return_errors=False)
 
     # Verify concatenated schema contents
     assert concatenated is not None

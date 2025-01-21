@@ -2,7 +2,7 @@
 """Core functionality for the LinkML Toolkit."""
 
 from pathlib import Path
-from typing import Dict, List, Union, Optional, Any
+from typing import Dict, List, Union, Optional, Any, Tuple
 import logging
 import yaml
 import sys
@@ -735,8 +735,13 @@ class LinkMLProcessor:
 
     @classmethod
     def concat_multiple(
-        cls, schema_list: str, input_type: str = "auto", validate: bool = True, strict: bool = False
-    ) -> Dict:
+        cls,
+        schema_list: str,
+        input_type: str = "auto",
+        validate: bool = True,
+        strict: bool = False,
+        return_errors: bool = True,
+    ) -> Union[Dict, Tuple[Dict, Dict]]:
         """
         Concatenate multiple schemas while preserving structure of the first schema.
 
@@ -745,9 +750,13 @@ class LinkMLProcessor:
             input_type: Method of interpreting input
             validate: Whether to validate schemas during processing
             strict: Enable strict error handling
+            return_errors: Whether to return validation errors along with the schema
 
         Returns:
-            Dict containing concatenated schema maintaining original structure
+            If return_errors=False:
+                Dict containing concatenated schema maintaining original structure
+            If return_errors=True:
+                Tuple[Dict, Dict] containing (concatenated schema, validation errors by schema)
         """
         # Load schema paths
         paths = cls._load_schema_list(schema_list, input_type)
@@ -757,6 +766,7 @@ class LinkMLProcessor:
 
         # Process schemas
         processed_schemas = []
+        errors = {}
         for path in paths:
             try:
                 processor = cls(path, validate=validate, strict=strict)
@@ -764,6 +774,8 @@ class LinkMLProcessor:
                     processed_schemas.append(processor)
                 else:
                     logger.warning(f"Skipping empty schema: {path}")
+                if processor.errors:
+                    errors[str(path)] = processor.errors
             except Exception as e:
                 logger.error(f"Failed to process schema {path}: {e}")
                 if strict:
@@ -819,6 +831,8 @@ class LinkMLProcessor:
                     )
                     concatenated["subsets"][new_key] = empty_format
 
+        if return_errors:
+            return concatenated, errors
         return concatenated
 
     def analyze_schema_structure(self) -> Dict:
