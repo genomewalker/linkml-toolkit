@@ -114,12 +114,72 @@ class SchemaVisualizer:
             // Initialize mermaid for diagrams
             mermaid.initialize({{ startOnLoad: true }});
 
-            // Updated Search Functionality
+            // Toggle Functions for Schema Sections
+            function toggleSection(sectionType) {{
+                const list = document.getElementById(`${{sectionType}}-list`);
+                const icon = document.getElementById(`${{sectionType}}-icon`);
+                
+                if (list && icon) {{
+                    // Toggle the list visibility
+                    if (list.classList.contains('hidden')) {{
+                        list.classList.remove('hidden');
+                        icon.classList.add('rotate-180');
+                    }} else {{
+                        list.classList.add('hidden');
+                        icon.classList.remove('rotate-180');
+                    }}
+                }}
+            }}
+
+            // Toggle Details for Elements
+            function toggleDetails(detailsId) {{
+                const detailsElement = document.getElementById(detailsId);
+                if (!detailsElement) return;
+
+                // Find the parent card and then the button within it
+                const parentCard = detailsElement.closest('[data-searchable="true"]');
+                if (!parentCard) return;
+                
+                const button = parentCard.querySelector('button');
+                if (!button) return;
+
+                const buttonText = button.querySelector('.details-text');
+                const buttonIcon = button.querySelector('svg');
+                
+                if (detailsElement.classList.contains('hidden')) {{
+                    // Show details
+                    detailsElement.classList.remove('hidden');
+                    buttonText.textContent = 'Show less';
+                    buttonIcon.classList.add('rotate-180');
+                }} else {{
+                    // Hide details
+                    detailsElement.classList.add('hidden');
+                    buttonText.textContent = 'Show more';
+                    buttonIcon.classList.remove('rotate-180');
+                }}
+            }}
+
+            // Initialize sidebar sections to be closed by default
+            document.addEventListener('DOMContentLoaded', function() {{
+                // Update the counts but keep sections closed
+                const sections = document.querySelectorAll('[data-section-type]');
+                sections.forEach(section => {{
+                    const sectionType = section.dataset.sectionType;
+                    const countElement = document.getElementById(`${{sectionType}}-count`);
+                    const list = document.getElementById(`${{sectionType}}-list`);
+                    
+                    if (list && countElement) {{
+                        const items = list.querySelectorAll('[data-searchable="true"]');
+                        countElement.textContent = items.length;
+                    }}
+                }});
+            }});
+
+            // Search Functionality
             function filterElements() {{
                 const query = document.getElementById('search-box').value.toLowerCase();
                 const elements = document.querySelectorAll('[data-searchable="true"]');
                 
-                // Track the total counts for each type
                 const totalCounts = {{}};
                 elements.forEach(el => {{
                     const type = el.dataset.type;
@@ -131,13 +191,11 @@ class SchemaVisualizer:
 
                 let visibleCount = {{}};
 
-                // Reset styles for all elements before applying filters
                 elements.forEach(el => {{
-                    el.style.display = ''; // Show all elements
-                    el.classList.remove('search-highlight'); // Remove highlight
+                    el.style.display = '';
+                    el.classList.remove('search-highlight');
                 }});
 
-                // Apply filter if query is not empty
                 if (query) {{
                     elements.forEach(el => {{
                         const text = el.textContent.toLowerCase();
@@ -148,16 +206,42 @@ class SchemaVisualizer:
                         }}
 
                         if (text.includes(query)) {{
-                            el.style.display = ''; // Show matching element
-                            el.classList.add('search-highlight'); // Add highlight
+                            el.style.display = '';
+                            el.classList.add('search-highlight');
                             visibleCount[type]++;
+                            
+                            // Show parent section when item matches
+                            const parentSection = el.closest('[data-section-type]');
+                            if (parentSection) {{
+                                const sectionType = parentSection.dataset.sectionType;
+                                const list = document.getElementById(`${{sectionType}}-list`);
+                                const icon = document.getElementById(`${{sectionType}}-icon`);
+                                if (list) {{
+                                    list.classList.remove('hidden');
+                                }}
+                                if (icon) {{
+                                    icon.classList.add('rotate-180');
+                                }}
+                            }}
                         }} else {{
-                            el.style.display = 'none'; // Hide non-matching element
+                            el.style.display = 'none';
                         }}
                     }});
                 }} else {{
-                    // If the query is empty, reset visible counts to total counts
                     visibleCount = {{ ...totalCounts }};
+                    
+                    // When clearing search, collapse all sections
+                    sections.forEach(section => {{
+                        const sectionType = section.dataset.sectionType;
+                        const list = document.getElementById(`${{sectionType}}-list`);
+                        const icon = document.getElementById(`${{sectionType}}-icon`);
+                        if (list) {{
+                            list.classList.add('hidden');
+                        }}
+                        if (icon) {{
+                            icon.classList.remove('rotate-180');
+                        }}
+                    }});
                 }}
 
                 // Update sidebar counts
@@ -404,7 +488,7 @@ class SchemaVisualizer:
                 badges.append(
                     f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Range: {info["range"]}</span>'
                 )
-        elif element_type == "enums":
+        elif element_type == "enum":
             if info.get("permissible_values"):
                 badges.append(
                     f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">{len(info["permissible_values"])} values</span>'
@@ -418,29 +502,41 @@ class SchemaVisualizer:
         # Generate details content
         details_content = generate_element_details(element_type, info, self.schema_view)
 
+        # Generate unique ID for the element
+        details_id = f"{element_type}-{name}-details"
+        button_id = f"{element_type}-{name}-button"
+
         return f"""
-        <div id="{element_type}-{name}" data-searchable="true" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+        <div id="{element_type}-{name}" data-searchable="true" data-type="{element_type}" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
             <div class="p-4">
                 <h3 class="text-lg font-semibold mb-2">{name}</h3>
                 
                 <div class="flex flex-wrap gap-2 mb-3">
                     {badges_html}
                 </div>
+                
                 <div class="text-sm text-gray-600 mb-3">
                     {info.get('description', '')}
                 </div>
 
-                <div id="{element_type}-{name}-details" class="hidden border-t pt-3">
+                <div id="{details_id}" class="hidden border-t pt-3 mt-3">
                     {details_content}
                 </div>
             </div>
 
-            <button onclick="toggleDetails('{element_type}-{name}-details')" 
-                    class="w-full p-2 text-sm text-gray-500 hover:bg-gray-50 border-t flex items-center justify-center gap-1">
+            <button 
+                id="{button_id}"
+                onclick="toggleDetails('{details_id}')"
+                class="w-full p-2 text-sm text-gray-500 hover:bg-gray-50 border-t flex items-center justify-center gap-1">
                 <span class="details-text">Show more</span>
                 <svg class="h-4 w-4 transform transition-transform duration-200" 
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                     fill="none" 
+                     stroke="currentColor" 
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" 
+                          stroke-linejoin="round" 
+                          stroke-width="2" 
+                          d="M19 9l-7 7-7-7"/>
                 </svg>
             </button>
         </div>
