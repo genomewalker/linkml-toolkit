@@ -179,6 +179,7 @@ class SchemaVisualizer:
             function filterElements() {{
                 const query = document.getElementById('search-box').value.toLowerCase();
                 const elements = document.querySelectorAll('[data-searchable="true"]');
+                const sections = document.querySelectorAll('[data-section-type]');
                 
                 const totalCounts = {{}};
                 elements.forEach(el => {{
@@ -227,30 +228,36 @@ class SchemaVisualizer:
                             el.style.display = 'none';
                         }}
                     }});
+
+                    // Update counts for filtered results
+                    Object.keys(totalCounts).forEach(type => {{
+                        const countElement = document.getElementById(`${{type}}-count`);
+                        if (countElement) {{
+                            countElement.textContent = visibleCount[type] || 0;
+                        }}
+                    }});
                 }} else {{
-                    visibleCount = {{ ...totalCounts }};
-                    
-                    // When clearing search, collapse all sections
+                    // Reset search state
                     sections.forEach(section => {{
                         const sectionType = section.dataset.sectionType;
                         const list = document.getElementById(`${{sectionType}}-list`);
                         const icon = document.getElementById(`${{sectionType}}-icon`);
+                        const countElement = document.getElementById(`${{sectionType}}-count`);
+                        
                         if (list) {{
                             list.classList.add('hidden');
+                            // Get actual count of items in this section
+                            const items = list.querySelectorAll('[data-searchable="true"]');
+                            if (countElement) {{
+                                countElement.textContent = items.length;
+                            }}
                         }}
+                        
                         if (icon) {{
                             icon.classList.remove('rotate-180');
                         }}
                     }});
                 }}
-
-                // Update sidebar counts
-                Object.keys(totalCounts).forEach(type => {{
-                    const countElement = document.getElementById(`${{type}}-count`);
-                    if (countElement) {{
-                        countElement.textContent = visibleCount[type];
-                    }}
-                }});
             }}
         </script>
     </body>
@@ -500,7 +507,13 @@ class SchemaVisualizer:
         badges_html = "\n".join(badges)
 
         # Generate details content
-        details_content = generate_element_details(element_type, info, self.schema_view)
+        print(f"Generating details for {element_type} {name}")
+        if element_type == "slots":
+            details_content = generate_slot_details(info, self.schema_view)
+        elif element_type == "enums":
+            details_content = generate_enum_details(info, self.schema_view)
+        else:
+            details_content = generate_element_details(element_type, info, self.schema_view)
 
         # Generate unique ID for the element
         details_id = f"{element_type}-{name}-details"

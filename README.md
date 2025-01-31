@@ -114,10 +114,10 @@ lmtk subset --schema schema.yaml --classes class1 --no-inherited --output subset
 #### Schema Combination
 ```bash
 # Merge schemas
-lmtk combine --schema base.yaml --additional-schemas schema1.yaml,schema2.yaml --mode merge --output merged.yaml
+lmtk combine --schema base.yaml --additional-schemas schema1.yaml -a schema2.yaml --mode merge --output merged.yaml
 
 # Concatenate schemas
-lmtk combine --schema base.yaml --additional-schemas schema1.yaml,schema2.yaml --mode concat --output concatenated.yaml
+lmtk combine --schema base.yaml --additional-schemas schema1.yaml -a schema2.yaml --mode concat --output concatenated.yaml
 ```
 
 #### Schema Visualization
