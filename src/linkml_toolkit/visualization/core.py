@@ -507,7 +507,6 @@ class SchemaVisualizer:
         badges_html = "\n".join(badges)
 
         # Generate details content
-        print(f"Generating details for {element_type} {name}")
         if element_type == "slots":
             details_content = generate_slot_details(info, self.schema_view)
         elif element_type == "enums":
