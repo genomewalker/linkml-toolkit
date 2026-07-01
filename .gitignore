@@ -34,3 +34,4 @@ venv/
 ENV/
 docs/_build/
 .DS_Store
+src/linkml_toolkit/_version.py
