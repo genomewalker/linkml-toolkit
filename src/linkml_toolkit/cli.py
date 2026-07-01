@@ -775,6 +775,58 @@ def export(schema, format, output, rdf_format, sql_dialect):
     "--schema",
     type=click.Path(exists=True),
     required=True,
+    help="Path to the LinkML schema file",
+)
+@click.option(
+    "--class-name",
+    "-c",
+    required=True,
+    help="Name of the class to extract slot titles from",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    required=True,
+    help="Output file path",
+)
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["tsv", "csv"]),
+    default="tsv",
+    help="Output delimiter format",
+)
+def checklist_template(schema, class_name, output, format):
+    """Generate a header-only template of a class's slot titles, ordered by rank.
+
+    Useful for building checklist submission templates (e.g. ENA/GSC MIxS
+    checklists) where each column header is the human-readable title of a
+    schema slot rather than its machine-readable name.
+    """
+    ctx = click.get_current_context()
+    quiet = ctx.obj.get("quiet", False)
+
+    try:
+        exporter = SchemaExporter(schema)
+        delimiter = "\t" if format == "tsv" else ","
+        exporter.to_checklist_template(class_name, Path(output), delimiter=delimiter)
+
+        if not quiet:
+            console.print(
+                f"[green]Successfully wrote checklist template for '{class_name}' to {output}[/green]"
+            )
+
+    except Exception as e:
+        console.print(f"[red]Error generating checklist template:[/red] {str(e)}")
+        sys.exit(1)
+
+
+@main.command()
+@click.option(
+    "--schema",
+    type=click.Path(exists=True),
+    required=True,
     help="Path to the source LinkML schema file",
 )
 @click.option(

@@ -46,6 +46,53 @@ def test_export_json_schema(basic_schema, tmp_path):
         raise
 
 
+def test_checklist_template(tmp_path):
+    """Test that slot titles are exported ordered by rank, not declaration order."""
+    schema_path = tmp_path / "checklist_schema.yaml"
+    schema_path.write_text(
+        """
+id: https://example.org/checklist_schema
+name: checklist_schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+default_range: string
+
+classes:
+  Sample:
+    slots:
+      - sample_id
+      - collection_date
+      - host_taxon
+    slot_usage:
+      sample_id:
+        rank: 3
+      collection_date:
+        rank: 1
+      host_taxon:
+        rank: 2
+
+slots:
+  sample_id:
+    title: sample identifier
+  collection_date:
+    title: collection date
+  host_taxon:
+    title: host taxon
+"""
+    )
+    output_path = tmp_path / "template.tsv"
+
+    exporter = SchemaExporter(schema_path)
+    exporter.to_checklist_template("Sample", output_path)
+
+    with open(output_path, newline="") as f:
+        rows = list(csv.reader(f, delimiter="\t"))
+
+    assert rows == [["collection date", "host taxon", "sample identifier"]]
+
+
 def test_export_rdf(basic_schema, tmp_path):
     """Test export to RDF."""
     output_path = tmp_path / "schema.ttl"
