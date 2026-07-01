@@ -100,7 +100,7 @@ class SchemaValidator:
     def _load_yaml(self, path: Path) -> dict:
         """Load and parse YAML file."""
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 return yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML syntax: {str(e)}")

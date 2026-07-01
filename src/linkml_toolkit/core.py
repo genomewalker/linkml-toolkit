@@ -151,7 +151,9 @@ class LinkMLProcessor:
             if self.strict:
                 raise ValueError(f"Error creating SchemaDefinition: {str(e)}")
             # In non-strict mode, create minimal schema
-            return SchemaDefinition(name=schema_dict["name"], id=schema_dict["id"])
+            name = schema_dict.get("name") or self.schema_path.stem
+            schema_id = schema_dict.get("id") or f"https://w3id.org/linkml/{name}"
+            return SchemaDefinition(name=name, id=schema_id)
 
     def _convert_to_dict(self, obj: Any) -> Dict:
         """Helper method to safely convert objects to dictionaries."""
@@ -515,9 +517,9 @@ class LinkMLProcessor:
                     # Get slot usage from the class definition
                     slot_usage = {}
                     if hasattr(class_def, "slot_usage") and class_def.slot_usage:
-                        slot_usage = getattr(
-                            class_def.slot_usage.get(slot_name, {}), "attributes", {}
-                        )
+                        usage_def = class_def.slot_usage.get(slot_name)
+                        if usage_def is not None:
+                            slot_usage = {"required": getattr(usage_def, "required", False)}
 
                     # Check if slot is directly in class slots
                     is_direct = slot_name in (class_def.slots or [])
@@ -722,11 +724,7 @@ class LinkMLProcessor:
                 for key, value in other_processor.schema_dict["subsets"].items():
                     if key not in merged["subsets"]:
                         # Use the same empty value format as the base schema
-                        empty_format = (
-                            base_structure["empty_values"]
-                            .get("subsets", {})
-                            .get(next(iter(base_processor.schema_dict.get("subsets", {})), None))
-                        )
+                        empty_format = base_structure["empty_values"].get("subsets", {}).get(key)
                         merged["subsets"][key] = empty_format
 
         if return_errors:
@@ -824,11 +822,7 @@ class LinkMLProcessor:
                 for key in other_processor.schema_dict["subsets"]:
                     new_key = f"{key}_{path_stem}" if key in concatenated["subsets"] else key
                     # Use the same empty value format as the base schema
-                    empty_format = (
-                        base_structure["empty_values"]
-                        .get("subsets", {})
-                        .get(next(iter(base_processor.schema_dict.get("subsets", {})), None))
-                    )
+                    empty_format = base_structure["empty_values"].get("subsets", {}).get(key)
                     concatenated["subsets"][new_key] = empty_format
 
         if return_errors:

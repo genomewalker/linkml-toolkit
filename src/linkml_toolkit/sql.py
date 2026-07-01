@@ -78,7 +78,9 @@ class SQLExporter:
             for enum_name, enum_def in self.schema_view.all_enums().items():
                 enum_values = enum_def.permissible_values or {}
                 if enum_values:
-                    values_str = ", ".join(f"'{v}'" for v in enum_values.keys())
+                    values_str = ", ".join(
+                        f"'{v.replace(chr(39), chr(39) * 2)}'" for v in enum_values.keys()
+                    )
                     statements.append(f"CREATE TYPE {enum_name}_enum AS ENUM ({values_str});")
 
         # Generate tables for each class
@@ -115,8 +117,13 @@ class SQLExporter:
                 if slot_def.identifier:
                     primary_key = slot_name
                 if slot_def.pattern:
-                    if dialect in [SQLDialect.POSTGRESQL, SQLDialect.MYSQL]:
-                        constraints.append(f"CHECK ({slot_name} ~ '{slot_def.pattern}')")
+                    escaped_pattern = slot_def.pattern.replace(chr(39), chr(39) * 2)
+                    if dialect == SQLDialect.POSTGRESQL:
+                        constraints.append(f"CHECK ({slot_name} ~ '{escaped_pattern}')")
+                    elif dialect == SQLDialect.MYSQL:
+                        constraints.append(
+                            f"CHECK ({slot_name} REGEXP '{escaped_pattern}')"
+                        )
                 if slot_def.minimum_value is not None:
                     constraints.append(f"CHECK ({slot_name} >= {slot_def.minimum_value})")
                 if slot_def.maximum_value is not None:
@@ -129,14 +136,16 @@ class SQLExporter:
 
                 # Handle foreign key references
                 if range_type in self.schema_view.all_classes():
-                    fk_name = f"fk_{class_name}_{slot_name}"
-                    fk_stmt = (
-                        f"ALTER TABLE {class_name} "
-                        f"ADD CONSTRAINT {fk_name} "
-                        f"FOREIGN KEY ({slot_name}) "
-                        f"REFERENCES {range_type} ({primary_key});"
-                    )
-                    self._fkey_statements.append(fk_stmt)
+                    target_identifier = self.schema_view.get_identifier_slot(range_type)
+                    if target_identifier:
+                        fk_name = f"fk_{class_name}_{slot_name}"
+                        fk_stmt = (
+                            f"ALTER TABLE {class_name} "
+                            f"ADD CONSTRAINT {fk_name} "
+                            f"FOREIGN KEY ({slot_name}) "
+                            f"REFERENCES {range_type} ({target_identifier.name});"
+                        )
+                        self._fkey_statements.append(fk_stmt)
 
             # Add primary key if it exists
             if primary_key:

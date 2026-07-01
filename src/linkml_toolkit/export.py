@@ -127,7 +127,7 @@ class SchemaExporter:
             return file_path
 
         # Export classes
-        classes_file = ensure_valid_file_path(output_dir / f'classes{".tsv" if delimiter == "\\t" else ".csv"}')
+        classes_file = ensure_valid_file_path(output_dir / f'classes{".tsv" if delimiter == "\t" else ".csv"}')
         self._write_csv(
             classes_file,
             ['name', 'description', 'slots', 'is_a', 'mixins', 'abstract', 'tree_root'],
@@ -147,7 +147,7 @@ class SchemaExporter:
         )
 
         # Export slots
-        slots_file = ensure_valid_file_path(output_dir / f'slots{".tsv" if delimiter == "\\t" else ".csv"}')
+        slots_file = ensure_valid_file_path(output_dir / f'slots{".tsv" if delimiter == "\t" else ".csv"}')
         self._write_csv(
             slots_file,
             ['name', 'description', 'range', 'required', 'multivalued', 'pattern', 
@@ -171,7 +171,7 @@ class SchemaExporter:
         )
 
         # Export enums
-        enums_file = ensure_valid_file_path(output_dir / f'enums{".tsv" if delimiter == "\\t" else ".csv"}')
+        enums_file = ensure_valid_file_path(output_dir / f'enums{".tsv" if delimiter == "\t" else ".csv"}')
         enums_data = []
         for enum_name, enum_def in self.schema_view.all_enums().items():
             permissible_values = enum_def.permissible_values or {}
@@ -192,7 +192,7 @@ class SchemaExporter:
         )
 
         # Export types
-        types_file = ensure_valid_file_path(output_dir / f'types{".tsv" if delimiter == "\\t" else ".csv"}')
+        types_file = ensure_valid_file_path(output_dir / f'types{".tsv" if delimiter == "\t" else ".csv"}')
         self._write_csv(
             types_file,
             ['name', 'description', 'base', 'uri', 'pattern'],

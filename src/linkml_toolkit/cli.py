@@ -121,9 +121,13 @@ def display_slot_info(info: Dict, detailed: bool = False):
 
     for label, attr in primary_attrs:
         if attr in info:
-            value = (
-                "Yes" if isinstance(info[attr], bool) and info[attr] else str(info[attr]) or "N/A"
-            )
+            raw_value = info[attr]
+            if isinstance(raw_value, bool):
+                value = "Yes" if raw_value else "No"
+            elif raw_value is None:
+                value = "N/A"
+            else:
+                value = str(raw_value)
             table.add_row(f"[bold]{label}[/bold]", value)
 
     # Value constraints
@@ -520,7 +524,7 @@ def analyze(
                     sys.exit(1)
                 else:
                     console.print(
-                        "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                        "[yellow]WARNING:[/yellow] Continuing with analysis despite validation errors"
                     )
 
         except Exception as schema_load_error:
@@ -529,6 +533,16 @@ def analyze(
 
         # Specific entity analysis
         if entity and name:
+            if output or tree:
+                console.print(
+                    "[yellow]Warning:[/yellow] --output and --tree are ignored when "
+                    "--entity/--name are provided"
+                )
+            if include_inherited and entity.lower() != "class":
+                console.print(
+                    "[yellow]Warning:[/yellow] --include-inherited only applies to --entity class"
+                )
+
             # Map entity to appropriate analysis and display functions
             entity_map = {
                 "class": {
@@ -713,7 +727,7 @@ def export(schema, format, output, rdf_format, sql_dialect):
 
     try:
         # Validate schema
-        validator = SchemaValidator(schema, strict=strict)
+        validator = SchemaValidator(quiet=quiet, strict=strict)
         errors = validator.validate_schema(schema)
         if errors:
             for error in errors:
@@ -728,7 +742,7 @@ def export(schema, format, output, rdf_format, sql_dialect):
                 sys.exit(1)
             else:
                 console.print(
-                    "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                    "[yellow]WARNING:[/yellow] Continuing with export despite validation errors"
                 )
 
         exporter = SchemaExporter(schema)
@@ -847,16 +861,23 @@ def combine(schema, additional_schemas, output, mode):
     strict = ctx.obj.get("strict", False)
 
     try:
+        if not additional_schemas:
+            console.print(
+                "[red]Error:[/red] --additional-schemas is required: at least two schemas "
+                "are needed to combine"
+            )
+            sys.exit(1)
+
         all_schemas = [schema] + list(additional_schemas)
         schema_list = ",".join(str(s) for s in all_schemas)
 
         if mode == "merge":
             result, errors = LinkMLProcessor.merge_multiple(
-                schema_list, validate=True, strict=strict, return_errors=True
+                schema_list, input_type="list", validate=True, strict=strict, return_errors=True
             )
         else:  # concat
             result, errors = LinkMLProcessor.concat_multiple(
-                schema_list, validate=True, strict=strict, return_errors=True
+                schema_list, input_type="list", validate=True, strict=strict, return_errors=True
             )
 
         if errors:
@@ -876,7 +897,7 @@ def combine(schema, additional_schemas, output, mode):
                 sys.exit(1)
             else:
                 console.print(
-                    "[yellow]WARNING:[/yellow]Continuing with schema combination despite validation errors"
+                    "[yellow]WARNING:[/yellow] Continuing with schema combination despite validation errors"
                 )
 
         processor = LinkMLProcessor(schema, validate=False)

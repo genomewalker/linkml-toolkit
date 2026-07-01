@@ -467,17 +467,21 @@ class SchemaVisualizer:
 
     def _generate_element_card(self, name: str, info: Dict, element_type: str) -> str:
         """Generate a card for a schema element."""
+        # `element_type` here is the plural section name ("classes", "slots", "enums", "types")
+        singular_types = {"classes": "class", "slots": "slot", "enums": "enum", "types": "type"}
+        element_singular = singular_types.get(element_type, element_type)
+
         # Generate badges
         badges = []
 
         # Add type badge
         type_colors = {"class": "blue", "slot": "green", "enum": "yellow", "type": "purple"}
         badges.append(
-            f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-{type_colors.get(element_type, "gray")}-100 text-{type_colors.get(element_type, "gray")}-800">{element_type.title()}</span>'
+            f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-{type_colors.get(element_singular, "gray")}-100 text-{type_colors.get(element_singular, "gray")}-800">{element_singular.title()}</span>'
         )
 
         # Add element-specific badges
-        if element_type == "class":
+        if element_singular == "class":
             if info.get("abstract"):
                 badges.append(
                     '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Abstract</span>'
@@ -486,7 +490,7 @@ class SchemaVisualizer:
                 badges.append(
                     f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">{len(info["slots"])} slots</span>'
                 )
-        elif element_type == "slot":
+        elif element_singular == "slot":
             if info.get("required"):
                 badges.append(
                     '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Required</span>'
@@ -495,7 +499,7 @@ class SchemaVisualizer:
                 badges.append(
                     f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Range: {info["range"]}</span>'
                 )
-        elif element_type == "enum":
+        elif element_singular == "enum":
             if info.get("permissible_values"):
                 badges.append(
                     f'<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">{len(info["permissible_values"])} values</span>'
@@ -512,7 +516,7 @@ class SchemaVisualizer:
         elif element_type == "enums":
             details_content = generate_enum_details(info, self.schema_view)
         else:
-            details_content = generate_element_details(element_type, info, self.schema_view)
+            details_content = generate_element_details(element_singular, info, self.schema_view)
 
         # Generate unique ID for the element
         details_id = f"{element_type}-{name}-details"
@@ -904,15 +908,10 @@ class SchemaVisualizer:
 
     def generate_documentation(self, output_path: Path) -> None:
         """Generate full documentation bundle."""
+        output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Generate main visualization
+        # Generate main visualization (hierarchy and per-element sections are
+        # already embedded in this single page)
         index_path = output_path / "visualization.html"
         self.generate_visualization(index_path)
-
-        # Generate hierarchy diagram
-        hierarchy_path = output_path / "hierarchy.html"
-        self._save_hierarchy_diagram(hierarchy_path)
-
-        # Generate documentation pages for each element type
-        self._generate_element_docs(output_path)
