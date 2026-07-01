@@ -119,6 +119,7 @@ class SchemaExporter:
             raise ValueError(f"Output path {output_dir} must be a directory.")
         
         output_dir.mkdir(parents=True, exist_ok=True)
+        ext = ".tsv" if delimiter == "\t" else ".csv"
 
         def ensure_valid_file_path(file_path: Path) -> Path:
             """Ensure the given file_path is a valid file."""
@@ -127,7 +128,7 @@ class SchemaExporter:
             return file_path
 
         # Export classes
-        classes_file = ensure_valid_file_path(output_dir / f'classes{".tsv" if delimiter == "\t" else ".csv"}')
+        classes_file = ensure_valid_file_path(output_dir / f'classes{ext}')
         self._write_csv(
             classes_file,
             ['name', 'description', 'slots', 'is_a', 'mixins', 'abstract', 'tree_root'],
@@ -147,7 +148,7 @@ class SchemaExporter:
         )
 
         # Export slots
-        slots_file = ensure_valid_file_path(output_dir / f'slots{".tsv" if delimiter == "\t" else ".csv"}')
+        slots_file = ensure_valid_file_path(output_dir / f'slots{ext}')
         self._write_csv(
             slots_file,
             ['name', 'description', 'range', 'required', 'multivalued', 'pattern', 
@@ -171,7 +172,7 @@ class SchemaExporter:
         )
 
         # Export enums
-        enums_file = ensure_valid_file_path(output_dir / f'enums{".tsv" if delimiter == "\t" else ".csv"}')
+        enums_file = ensure_valid_file_path(output_dir / f'enums{ext}')
         enums_data = []
         for enum_name, enum_def in self.schema_view.all_enums().items():
             permissible_values = enum_def.permissible_values or {}
@@ -192,7 +193,7 @@ class SchemaExporter:
         )
 
         # Export types
-        types_file = ensure_valid_file_path(output_dir / f'types{".tsv" if delimiter == "\t" else ".csv"}')
+        types_file = ensure_valid_file_path(output_dir / f'types{ext}')
         self._write_csv(
             types_file,
             ['name', 'description', 'base', 'uri', 'pattern'],
@@ -208,6 +209,28 @@ class SchemaExporter:
             ],
             delimiter
         )
+
+    def to_checklist_template(
+        self, class_name: str, output_path: Union[str, Path], delimiter: str = '\t'
+    ) -> None:
+        """Export a single-row header template for a class's slot titles, ordered by rank.
+
+        Args:
+            class_name: Name of the class to extract slot titles from
+            output_path: Path to save the template file
+            delimiter: Field delimiter (',' for CSV, '\t' for TSV)
+        """
+        output_path = Path(output_path)
+        slots = self.schema_view.class_induced_slots(class_name)
+        ordered_slots = sorted(
+            slots, key=lambda s: s.rank if s.rank is not None else float('inf')
+        )
+        titles = [slot.title or slot.name for slot in ordered_slots]
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f, delimiter=delimiter)
+            writer.writerow(titles)
 
     def _write_csv(self, file_path: Path, fieldnames: List[str], data: List[Dict], delimiter: str = ',') -> None:
         """Helper method to write CSV/TSV files."""
