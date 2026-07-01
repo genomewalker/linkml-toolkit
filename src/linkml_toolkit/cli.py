@@ -797,7 +797,14 @@ def export(schema, format, output, rdf_format, sql_dialect):
     default="tsv",
     help="Output delimiter format",
 )
-def checklist_template(schema, class_name, output, format):
+@click.option(
+    "--repository",
+    "-r",
+    type=click.Choice(sorted(SchemaExporter.REPOSITORY_PREFIX_FIELDS), case_sensitive=False),
+    default=None,
+    help="Prepend the target repository's required columns (e.g. tax_id, sample_alias for ENA) ahead of the ranked slot titles",
+)
+def checklist_template(schema, class_name, output, format, repository):
     """Generate a header-only template of a class's slot titles, ordered by rank.
 
     Useful for building checklist submission templates (e.g. ENA/GSC MIxS
@@ -810,7 +817,9 @@ def checklist_template(schema, class_name, output, format):
     try:
         exporter = SchemaExporter(schema)
         delimiter = "\t" if format == "tsv" else ","
-        exporter.to_checklist_template(class_name, Path(output), delimiter=delimiter)
+        exporter.to_checklist_template(
+            class_name, Path(output), delimiter=delimiter, repository=repository
+        )
 
         if not quiet:
             console.print(

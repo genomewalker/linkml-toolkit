@@ -93,6 +93,58 @@ slots:
     assert rows == [["collection date", "host taxon", "sample identifier"]]
 
 
+def test_checklist_template_repository_prefix(tmp_path):
+    """Test that --repository ena prepends ENA's required columns."""
+    schema_path = tmp_path / "checklist_schema.yaml"
+    schema_path.write_text(
+        """
+id: https://example.org/checklist_schema
+name: checklist_schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+default_range: string
+
+classes:
+  Sample:
+    slots:
+      - sample_id
+    slot_usage:
+      sample_id:
+        rank: 1
+
+slots:
+  sample_id:
+    title: sample identifier
+"""
+    )
+    output_path = tmp_path / "template.tsv"
+
+    exporter = SchemaExporter(schema_path)
+    exporter.to_checklist_template("Sample", output_path, repository="ena")
+
+    with open(output_path, newline="") as f:
+        rows = list(csv.reader(f, delimiter="\t"))
+
+    assert rows == [
+        [
+            "tax_id",
+            "scientific_name",
+            "sample_alias",
+            "geographic location (latitude)",
+            "geographic location (longitude)",
+            "geographic location (country and/or sea)",
+            "sample_title",
+            "sample_description",
+            "sample identifier",
+        ]
+    ]
+
+    with pytest.raises(ValueError, match="Unsupported repository"):
+        exporter.to_checklist_template("Sample", output_path, repository="sra")
+
+
 def test_export_rdf(basic_schema, tmp_path):
     """Test export to RDF."""
     output_path = tmp_path / "schema.ttl"

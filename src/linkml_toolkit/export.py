@@ -210,8 +210,27 @@ class SchemaExporter:
             delimiter
         )
 
+    # Columns ENA requires ahead of the MIxS slot titles, in submission order.
+    # Derived from a manually-built ENA checklist template (MimsHostAssociatedAncient-ena.tsv).
+    REPOSITORY_PREFIX_FIELDS = {
+        'ena': [
+            'tax_id',
+            'scientific_name',
+            'sample_alias',
+            'geographic location (latitude)',
+            'geographic location (longitude)',
+            'geographic location (country and/or sea)',
+            'sample_title',
+            'sample_description',
+        ],
+    }
+
     def to_checklist_template(
-        self, class_name: str, output_path: Union[str, Path], delimiter: str = '\t'
+        self,
+        class_name: str,
+        output_path: Union[str, Path],
+        delimiter: str = '\t',
+        repository: Optional[str] = None,
     ) -> None:
         """Export a single-row header template for a class's slot titles, ordered by rank.
 
@@ -219,6 +238,8 @@ class SchemaExporter:
             class_name: Name of the class to extract slot titles from
             output_path: Path to save the template file
             delimiter: Field delimiter (',' for CSV, '\t' for TSV)
+            repository: If set, prepend the target repository's required columns
+                (e.g. 'ena') ahead of the ranked slot titles
         """
         output_path = Path(output_path)
         slots = self.schema_view.class_induced_slots(class_name)
@@ -226,6 +247,15 @@ class SchemaExporter:
             slots, key=lambda s: s.rank if s.rank is not None else float('inf')
         )
         titles = [slot.title or slot.name for slot in ordered_slots]
+
+        if repository:
+            prefix = self.REPOSITORY_PREFIX_FIELDS.get(repository.lower())
+            if prefix is None:
+                raise ValueError(
+                    f"Unsupported repository '{repository}'. "
+                    f"Supported: {', '.join(self.REPOSITORY_PREFIX_FIELDS)}"
+                )
+            titles = prefix + titles
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
